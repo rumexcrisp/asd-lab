@@ -32,5 +32,5 @@
     <!-- our own application nodes: !-->
     <node pkg="car_demo" type="planning_loop.py" name="planning_loop" />
     <node pkg="car_demo" type="controller_loop.py" name="controller_loop" />
-    <node pkg="car_demo" type="test_controller.py" name="test_controller" />
+    <node pkg="car_demo" type="test_controller.py" name="test_controller" output="screen"/>
 </launch>
