@@ -242,7 +242,7 @@ if __name__ == "__main__":
 
                 r_wheel = 0.31265
                 velocity_kmh = (
-                    0.25
+                    0.25 #0.25
                     * (
                         joint_state_dict["front_right_wheel_joint"]
                         + joint_state_dict["rear_left_wheel_joint"]
@@ -307,6 +307,7 @@ if __name__ == "__main__":
                     current_gear = Control.FORWARD
                     command.shift_gears = current_gear
 
+                command.throttle = 0.0001
                 pubControl.publish(command)
 
                 controlDebug = ControlDebug()

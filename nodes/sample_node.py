@@ -178,7 +178,7 @@ if __name__ == "__main__":
             command.throttle, command.brake = np.clip(throttle_desired, 0, 1), 0
         else:
             command.throttle, command.brake = 0, np.clip(-throttle_desired, 0, 1)
-        command.steer = 0.5
+        # command.steer = 0.5
         pub_control.publish(command)
 
         rate.sleep()
