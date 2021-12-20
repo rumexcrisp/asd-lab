@@ -2,6 +2,7 @@
 
 # This is a sample node that publishes arbitrary lane coefficients
 
+from numpy.linalg.linalg import LinAlgError
 import rospy
 import sys
 import numpy as np
@@ -11,6 +12,7 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from car_demo.msg import Control, LaneCoefficients
 from simulation_image_helper import SimulationImageHelper
+from m_estimator import LS_lane_residuals, LS_lane_inliers, Cauchy, MEstimator_lane_fit
 
 
 class ControlTestLoop:
@@ -34,6 +36,10 @@ class ControlTestLoop:
         # a sample set of lane coefficients:
         #   W, Y_offset, dPhi, c0
         self.Z_opt = np.array([4, 0, 0, 0.04]).T
+
+
+
+
 
     def callback(self, message):
         # get image
@@ -85,16 +91,21 @@ class ControlTestLoop:
         lane_left = np.empty((0,2))
         lane_right = np.empty((0,2))
 
-        # for i in range(M.shape[0]):
-        #     if cv2.pointPolygonTest(roi_left_line, (M[i,0], M[i,1]), False) > 0:
-        #         lane_left = np.vstack((lane_left, M[i,:])) 
-        #     if cv2.pointPolygonTest(roi_right_line, (M[i,0], M[i,1]), False) > 0:
-        #         lane_right = np.vstack((lane_right, M[i,:]))
-
         cv_image_color = cv2.cvtColor(cv_image, cv2.COLOR_GRAY2BGR)
 
         roi_left_line_transform = self.imageHelper.road2image(roi_left_line)
         roi_right_line_transform = self.imageHelper.road2image(roi_right_line)
+
+        rospy.loginfo(roi_left_line_transform)
+        # rospy.loginfo(roi_left_line_transform.astype(np.int32))
+        # rospy.loginfo(type(roi_left_line_transform))
+
+        for i in range(M.shape[0]):
+            if cv2.pointPolygonTest(roi_left_line_transform.astype(np.int32), (M[i,0], M[i,1]), False) > 0:
+                lane_left = np.vstack((lane_left, M[i,:])) 
+            if cv2.pointPolygonTest(roi_right_line_transform.astype(np.int32), (M[i,0], M[i,1]), False) > 0:
+                lane_right = np.vstack((lane_right, M[i,:]))
+
         cv2.polylines(
             cv_image_color,
             [roi_left_line_transform.astype(np.int32)],
@@ -112,6 +123,12 @@ class ControlTestLoop:
 
         self.pubCannyImage.publish(self.bridge.cv2_to_imgmsg(cv_image_color))
 
+        Z_initial = np.array([4, -2, 0, 0]).T
+        try:
+            Z_MEst = MEstimator_lane_fit(lane_left, lane_right, Z_initial, sigma=0.2, maxIteration=10)
+            self.Z_opt = Z_MEst
+        except LinAlgError as e:
+            rospy.logerr_throttle(1, e)
 
 
 
