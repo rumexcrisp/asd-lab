@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <arg name="model" default="$(find car_demo)/urdf/prius.urdf" />
-    <arg name="rvizconfig" default="$(find car_demo)/rviz/demo.rviz" />
+    <arg name="rvizconfig" default="$(find car_demo)/rviz/demo2.rviz" />
     <arg name="world_name" default="$(find car_demo)/worlds/carolo.world" />
     <arg name="gui" default="false" />
     <arg name="initial_pose" default="-x -19.7 -y -6.66 -z 0.05 -Y -0.6090" />
