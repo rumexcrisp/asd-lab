@@ -7,6 +7,7 @@ import rospy
 import sys
 import numpy as np
 import cv2
+import time
 import std_msgs.msg
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
@@ -35,7 +36,8 @@ class ControlTestLoop:
 
         # a sample set of lane coefficients:
         #   W, Y_offset, dPhi, c0
-        self.Z_opt = np.array([4, 0, 0, 0.04]).T
+        self.Z_opt = np.array([4, 0, 0, 0.0]).T
+        self.Z_initial = np.array([4, -2, 0, 0]).T
 
 
 
@@ -65,28 +67,35 @@ class ControlTestLoop:
         threshold2 = threshold1*ratio
 
         # Canny Edge Detection
-        edges = cv2.Canny(img_blur, threshold1, threshold2, kernelSize) # Canny Edge Detection
+        edges = cv2.Canny(img_blur, threshold1, threshold2, kernelSize)  # Canny Edge Detection
         # mask = edges != 0
-        # newImg = cv_image * (mask[:,:,None].astype(cv_image.dtype))
+        # newImg = cv_image * (mask[:, :, None].astype(cv_image.dtype))
+
+        # rospy.loginfo(type(newImg))
+
+        # self.pubCannyImage.publish(self.bridge.cv2_to_imgmsg(self.bridge.cv2_to_imgmsg(cv_image)))
 
 
         indices = np.where(edges != [0])
-        M = np.column_stack((indices[0], indices[1]))
+        M = np.column_stack((indices[1], indices[0]))
         # rospy.loginfo("M:")
         # rospy.loginfo(M)
-        max_range_m = 45
         roi_left_line = np.array([
-            [3, 0],
-            [3, 4],
-            [8, 4],
-            [8, -4],
-            [4, 0] ])
+            [3, 0],  # mitte unten
+            [3, 1.5],  # links unten
+            [0, 1.5],
+            [0, 2],
+            [10, 4],  # links oben
+            [10, -4],  # rechts oben
+            [5, 0] ])  # mitte mitte
         roi_right_line = np.array([
             [3, 0],
-            [3, -4],
-            [8, -4],
-            [8, 4],
-            [4, 0] ])
+            [3, -1.5],
+            [0, -1.5],
+            [0, -2],
+            [10, -4],
+            [10, 4],
+            [5, 0] ])
 
         lane_left = np.empty((0,2))
         lane_right = np.empty((0,2))
@@ -96,15 +105,18 @@ class ControlTestLoop:
         roi_left_line_transform = self.imageHelper.road2image(roi_left_line)
         roi_right_line_transform = self.imageHelper.road2image(roi_right_line)
 
-        rospy.loginfo(roi_left_line_transform)
+        # rospy.loginfo(roi_left_line_transform)
         # rospy.loginfo(roi_left_line_transform.astype(np.int32))
         # rospy.loginfo(type(roi_left_line_transform))
 
         for i in range(M.shape[0]):
-            if cv2.pointPolygonTest(roi_left_line_transform.astype(np.int32), (M[i,0], M[i,1]), False) > 0:
-                lane_left = np.vstack((lane_left, M[i,:])) 
-            if cv2.pointPolygonTest(roi_right_line_transform.astype(np.int32), (M[i,0], M[i,1]), False) > 0:
-                lane_right = np.vstack((lane_right, M[i,:]))
+            if cv2.pointPolygonTest(roi_left_line_transform.astype(np.int32), (M[i, 0], M[i, 1]), False) > 0:
+                lane_left = np.vstack((lane_left, M[i, :])) 
+            if cv2.pointPolygonTest(roi_right_line_transform.astype(np.int32), (M[i, 0], M[i, 1]), False) > 0:
+                lane_right = np.vstack((lane_right, M[i, :]))
+
+        lane_left_transform = self.imageHelper.image2road(lane_left)
+        lane_right_transform = self.imageHelper.image2road(lane_right)
 
         cv2.polylines(
             cv_image_color,
@@ -120,16 +132,37 @@ class ControlTestLoop:
             color=(255, 0, 0),
             thickness=8,
         )
+        # cv2.polylines(
+        #     cv_image_color,
+        #     [lane_left.astype(np.int32)],
+        #     isClosed=True,
+        #     color=(0, 255, 0),
+        #     thickness=8,
+        # )
+        # cv2.polylines(
+        #     cv_image_color,
+        #     [lane_right.astype(np.int32)],
+        #     isClosed=True,
+        #     color=(0, 255, 255),
+        #     thickness=8,
+        # )
+        for point_left in lane_left.astype(np.int32):
+            cv2.circle(cv_image_color, tuple(point_left), 1, (0, 255, 0), 2)
+        for point_right in lane_right.astype(np.int32):
+            cv2.circle(cv_image_color, tuple(point_right), 1, (0, 255, 255), 2)
 
         self.pubCannyImage.publish(self.bridge.cv2_to_imgmsg(cv_image_color))
 
-        Z_initial = np.array([4, -2, 0, 0]).T
         try:
-            Z_MEst = MEstimator_lane_fit(lane_left, lane_right, Z_initial, sigma=0.2, maxIteration=10)
+            start = time.time()
+            Z_MEst = MEstimator_lane_fit(lane_left_transform, lane_right_transform, self.Z_initial, sigma=0.2, maxIteration=10)
+            end = time.time()
+            rospy.loginfo("Duration: " + str(end - start))
+            rospy.loginfo(Z_MEst)
             self.Z_opt = Z_MEst
+            # self.Z_initial = Z_MEst
         except LinAlgError as e:
             rospy.logerr_throttle(1, e)
-
 
 
 
@@ -153,13 +186,15 @@ class ControlTestLoop:
             coeffs.header.stamp.secs,
             coeffs.header.stamp.nsecs,
         )
+        rospy.spinOnce()
 
 
 def main(args):
     rospy.init_node("lane_detection_loop")
     myLoop = ControlTestLoop()
     try:
-        rospy.spin()
+        # rospy.spin()
+        rospy.spinOnce()
     except KeyboardInterrupt:
         print("Shutting down")
 
