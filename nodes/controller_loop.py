@@ -307,7 +307,7 @@ if __name__ == "__main__":
                     current_gear = Control.FORWARD
                     command.shift_gears = current_gear
 
-                command.throttle = 0.0001
+                command.throttle = ai
                 pubControl.publish(command)
 
                 controlDebug = ControlDebug()
