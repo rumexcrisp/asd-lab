@@ -146,7 +146,8 @@ def MEstimator_lane_fit(pL, pR, Z_initial, sigma=1, maxIteration=10):
         Z0 = Z
 
         # compute residuals
-        res = LS_lane_residuals(pL, pR, Z)
+        # res = LS_lane_residuals(pL, pR, Z)
+        res = np.dot(H, Z.reshape(4, 1)) - Y
 
         # recompute weights
         W = np.diag(Cauchy(res, sigma))

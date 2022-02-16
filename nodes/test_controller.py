@@ -37,7 +37,7 @@ class ControlTestLoop:
         # a sample set of lane coefficients:
         #   W, Y_offset, dPhi, c0
         self.Z_opt = np.array([4, 0, 0, 0.0]).T
-        self.Z_initial = np.array([4, -2, 0, 0]).T
+        self.Z_initial = np.array([4, 0, 0, 0]).T
 
 
 
@@ -54,7 +54,13 @@ class ControlTestLoop:
 
 
 
+        #________mask_____________________
+        # h = cv_image.shape[1]
+        # w = cv_image.shape[0]
 
+        # mask = np.full_like(cv_image, 255)
+        # mask = cv2.rectangle(mask, (int(w/10), h), (int((w/10)*9), h), (0,0,0), -1)
+        # masked_image = np.bitwise_and(cv_image, mask)
 
 
 
@@ -78,6 +84,7 @@ class ControlTestLoop:
 
         indices = np.where(edges != [0])
         M = np.column_stack((indices[1], indices[0]))
+        M = M[::3]
         # rospy.loginfo("M:")
         # rospy.loginfo(M)
         roi_left_line = np.array([
@@ -160,7 +167,8 @@ class ControlTestLoop:
             rospy.loginfo("Duration: " + str(end - start))
             rospy.loginfo(Z_MEst)
             self.Z_opt = Z_MEst
-            # self.Z_initial = Z_MEst
+            self.Z_initial = Z_MEst
+            self.Z_initial[0] = 4
         except LinAlgError as e:
             rospy.logerr_throttle(1, e)
 
@@ -186,15 +194,15 @@ class ControlTestLoop:
             coeffs.header.stamp.secs,
             coeffs.header.stamp.nsecs,
         )
-        rospy.spinOnce()
+        # rospy.spinOnce()
 
 
 def main(args):
     rospy.init_node("lane_detection_loop")
     myLoop = ControlTestLoop()
     try:
-        # rospy.spin()
-        rospy.spinOnce()
+        rospy.spin()
+        # rospy.spinOnce()
     except KeyboardInterrupt:
         print("Shutting down")
 
